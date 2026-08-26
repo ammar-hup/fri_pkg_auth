@@ -38,3 +38,5 @@ cdk.out/
 .kiro/steering/byterover-rules.md
 .qoder/rules/byterover-rules.md
 .augment/rules/byterover-rules.md
+# graphify build state — regenerable, never committed
+graphify-out/
