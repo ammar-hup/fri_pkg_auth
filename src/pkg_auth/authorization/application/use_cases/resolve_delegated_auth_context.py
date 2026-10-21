@@ -19,6 +19,8 @@ from .resolve_auth_context import ResolveAuthContextUseCase
 
 Delegators = Mapping[str, frozenset[OrgId]]
 
+ON_BEHALF_OF_HEADER = "X-On-Behalf-Of"
+
 
 async def find_organization(
     repo: OrganizationRepository, raw: str

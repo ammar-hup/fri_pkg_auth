@@ -47,6 +47,7 @@ from ...authorization.application.use_cases.resolve_auth_context import (
     ResolveAuthContextUseCase,
 )
 from ...authorization.application.use_cases.resolve_delegated_auth_context import (
+    ON_BEHALF_OF_HEADER,
     ResolveDelegatedAuthContextUseCase,
     find_organization,
 )
@@ -60,7 +61,6 @@ from ...authorization.domain.entities import User
 from ...authorization.domain.ports import OrganizationRepository
 
 DEFAULT_HEADER_NAME = "X-Organization-Id"
-ON_BEHALF_OF_HEADER = "X-On-Behalf-Of"
 
 # Unlisted reasons fall through to 403, so a new reason fails closed.
 _REFUSAL_STATUS: dict[DelegationRefusal, int] = {

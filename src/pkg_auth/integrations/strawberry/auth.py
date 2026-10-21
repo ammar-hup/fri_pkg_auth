@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 from uuid import UUID
 
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 
 from ...authentication import (
@@ -22,6 +23,9 @@ from ...authorization import (
 )
 from ...authorization.application.use_cases.resolve_auth_context import (
     ResolveAuthContextUseCase,
+)
+from ...authorization.application.use_cases.resolve_delegated_auth_context import (
+    ON_BEHALF_OF_HEADER,
 )
 from ...authorization.application.use_cases.resolve_user_from_jwt import (
     ResolveUserFromJwtUseCase,
@@ -80,6 +84,10 @@ def make_context_getter(
     rather than raising. Permission classes (``IsAuthenticated``,
     ``RequirePermission``) are responsible for rejecting under-privileged
     queries.
+
+    The one non-permissive case is ``X-On-Behalf-Of``: this integration
+    cannot delegate, so a request carrying it (any value, any token
+    state) is refused with HTTP 403 before any user work (``auth:AD-1``).
     """
     if (sync_user_use_case is None) == (resolve_user_use_case is None):
         raise ValueError(
@@ -88,6 +96,12 @@ def make_context_getter(
         )
 
     async def _context_getter(request: Request) -> StrawberryContext:
+        if request.headers.getlist(ON_BEHALF_OF_HEADER):
+            raise HTTPException(
+                status_code=403,
+                detail=f"{ON_BEHALF_OF_HEADER} is not accepted here",
+            )
+
         ctx = StrawberryContext(request=request)
 
         token = _extract_token(request, cookie_name)
