@@ -98,3 +98,38 @@ def test_auth_context_has_no_is_platform_field():
     """
     ctx = _make_ctx("course:edit")
     assert not hasattr(ctx, "is_platform")
+
+
+def test_acted_by_defaults_to_none():
+    assert _make_ctx("course:view").acted_by is None
+
+
+def test_replace_sets_acted_by_without_touching_perms():
+    from dataclasses import replace
+
+    ctx = _make_ctx("course:view")
+    agent = UserId(uuid4())
+    delegated = replace(ctx, acted_by=agent)
+    assert delegated.acted_by == agent
+    assert delegated.user_id == ctx.user_id
+    assert delegated.perms == ctx.perms
+    assert ctx.acted_by is None
+
+
+def test_cache_serializer_drops_acted_by():
+    from dataclasses import replace
+
+    from pkg_auth.authorization.adapters.cache.decorators import (
+        _deserialize_auth_context,
+        _serialize_auth_context,
+    )
+
+    ctx = AuthContext(
+        user_id=UserId(uuid4()),
+        organization_id=OrgId(uuid4()),
+        role_names=frozenset({"editor"}),
+        perms=frozenset({"course:edit"}),
+    )
+    blob = _serialize_auth_context(replace(ctx, acted_by=UserId(uuid4())))
+    assert b"acted_by" not in blob
+    assert _deserialize_auth_context(blob) == ctx
