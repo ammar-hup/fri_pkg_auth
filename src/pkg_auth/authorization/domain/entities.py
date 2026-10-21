@@ -163,12 +163,19 @@ class AuthContext:
     services cache their platform org's id at startup and call
     :func:`pkg_auth.authorization.is_platform_context` to compare against
     ``self.organization_id``. See the package docs for the pattern.
+
+    ``acted_by`` is **attribution only**. On a delegated (on-behalf-of)
+    request ``user_id`` is the target user — the acting principal for
+    authorization and ownership — and ``acted_by`` is the caller's ACL id;
+    it is ``None`` otherwise. It never grants or removes a permission, and
+    the cache serializer deliberately excludes it (``auth:AD-1``).
     """
 
     user_id: UserId
     organization_id: OrgId
     role_names: frozenset[str]
     perms: frozenset[str]
+    acted_by: UserId | None = None
 
     def has(self, perm: str) -> bool:
         """Return ``True`` if any of the user's roles grant ``perm``."""

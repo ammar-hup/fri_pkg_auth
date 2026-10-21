@@ -7,6 +7,8 @@ each to the right HTTP status.
 """
 from __future__ import annotations
 
+from enum import Enum
+
 
 class AuthorizationError(Exception):
     """Base for all authorization (ACL) failures."""
@@ -66,3 +68,37 @@ class ServiceNotSaaSAvailable(AuthorizationError):
 
 class ServiceNotEnabled(AuthorizationError):
     """The organization does not have the required service enabled."""
+
+
+class DelegationRefusal(str, Enum):
+    """Why a delegated (on-behalf-of) request was refused.
+
+    One member per row 3–9 of ``auth:AD-1``'s order of checks. Integration
+    layers map ``REPEATED`` and ``EMPTY_TARGET`` to 400,
+    ``UNKNOWN_ORGANIZATION`` to 404, and every other reason to 403.
+    """
+
+    REPEATED = "repeated"
+    NOT_A_DELEGATOR = "not_a_delegator"
+    EMPTY_TARGET = "empty_target"
+    UNKNOWN_ORGANIZATION = "unknown_organization"
+    ORGANIZATION_NOT_ALLOWED = "organization_not_allowed"
+    TARGET_NOT_PROVISIONED = "target_not_provisioned"
+    TARGET_NOT_A_MEMBER = "target_not_a_member"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class DelegationRefused(AuthorizationError):
+    """A delegated request was refused; ``reason`` says which check failed.
+
+    The only error :class:`ResolveDelegatedAuthContextUseCase` raises for a
+    refusal — never :class:`NotAMember` or :class:`UserNotProvisioned`, so
+    no integration can mistake a refused delegation for the caller's own
+    failure and fall back to the caller's context.
+    """
+
+    def __init__(self, reason: DelegationRefusal, detail: str | None = None) -> None:
+        self.reason = reason
+        super().__init__(detail or f"delegation refused: {reason.value}")

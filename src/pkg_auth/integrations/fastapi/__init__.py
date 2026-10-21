@@ -10,7 +10,8 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 from .auth_factory import Authentication, create_authentication
-from .auth_context_dep import make_get_auth_context
+from .auth_context_dep import ON_BEHALF_OF_HEADER, make_get_auth_context
+from .current_user_dep import make_get_current_user
 from .decorators import require_permission
 from .errors import install_exception_handlers
 from .identity_dep import bearer_scheme, extract_token_from_request
@@ -19,6 +20,8 @@ __all__ = [
     "Authentication",
     "create_authentication",
     "make_get_auth_context",
+    "make_get_current_user",
+    "ON_BEHALF_OF_HEADER",
     "require_permission",
     "install_exception_handlers",
     "bearer_scheme",

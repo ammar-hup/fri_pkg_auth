@@ -8,7 +8,7 @@ Public API:
                      MembershipRepository, PermissionCatalogRepository
     Exceptions:      AuthorizationError, NotAMember, MissingPermission,
                      UnknownOrganization, UnknownUser, UnknownRole,
-                     UserNotProvisioned
+                     UserNotProvisioned, DelegationRefused, DelegationRefusal
 
 The application layer (use cases) is added in M3; SQLAlchemy / Django ORM
 adapters in M4 / M6; cache layer in M5; framework integrations in M7-M9.
@@ -34,6 +34,8 @@ from .domain.entities import (
 from .platform import is_platform_context
 from .domain.exceptions import (
     AuthorizationError,
+    DelegationRefusal,
+    DelegationRefused,
     MissingPermission,
     NotAMember,
     PermissionVisibilityConflict,
@@ -118,4 +120,6 @@ __all__ = [
     "ServiceNotEnabled",
     "PermissionVisibilityConflict",
     "UserNotProvisioned",
+    "DelegationRefused",
+    "DelegationRefusal",
 ]

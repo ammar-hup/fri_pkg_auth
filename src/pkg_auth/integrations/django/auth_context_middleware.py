@@ -13,6 +13,9 @@ from ...authorization import (
     UnknownOrganization,
     UserNotProvisioned,
 )
+from ...authorization.application.use_cases.resolve_delegated_auth_context import (
+    ON_BEHALF_OF_HEADER,
+)
 from ...authorization.domain.entities import User
 from .install import get_registry
 
@@ -23,6 +26,9 @@ class AuthContextMiddleware:
     Requires ``IdentityMiddleware`` to run first so ``request.identity``
     is populated. Behavior:
 
+        - ``X-On-Behalf-Of`` present (any value, with or without the org
+          header or an identity) → 403; this middleware cannot delegate
+          (``auth:AD-1``)
         - no header → ``request.auth_context = None`` (route decides)
         - identity is None and header present → 401
         - org not found → 404
@@ -53,8 +59,14 @@ class AuthContextMiddleware:
             )
 
     async def __call__(self, request: HttpRequest) -> HttpResponse:
-        registry = get_registry()
         request.auth_context = None  # type: ignore[attr-defined]
+        if request.headers.get(ON_BEHALF_OF_HEADER) is not None:
+            return JsonResponse(
+                {"detail": f"{ON_BEHALF_OF_HEADER} is not accepted here"},
+                status=403,
+            )
+
+        registry = get_registry()
 
         raw = request.headers.get(registry.header_name)
         if raw is None:
