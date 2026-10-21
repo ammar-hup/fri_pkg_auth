@@ -3,6 +3,56 @@
 All notable changes to `pkg-auth` are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [3.2.0] — 2026-10-21
+
+### Added
+
+- **Delegated (on-behalf-of) authorization** (`auth:AD-1`): an allowlisted
+  agent sends `X-On-Behalf-Of: <target keycloak sub>` and is authorized with
+  exactly that user's permissions, only in the orgs on its list. Without the
+  header every existing call site behaves as in 3.1.0.
+- `ResolveDelegatedAuthContextUseCase(resolve_use_case, user_repo,
+  organization_repo, delegators=None)` — the one framework-free place that
+  holds the allowlist and makes every refusal. The target is looked up
+  read-only through `UserRepository.get_by_keycloak_sub`; delegation never
+  creates a user. On success it returns the target's own `AuthContext` (same
+  service guard, same cache entry); the caller's perms are never used.
+- `delegators`: `{agent_sub: [org_uuid, ...]}`, matched on the verified
+  token's `sub` only. Normalized at construction into an immutable map;
+  a bare `str`, a blank or padded `sub`, or a non-UUID org raises
+  `ValueError`. Unset or empty means nobody delegates (fail closed). The
+  platform org is refused unless an entry names it.
+- `DelegationRefused` (an `AuthorizationError`) carrying a `DelegationRefusal`
+  reason — one per check, never `NotAMember` or `UserNotProvisioned`, so no
+  caller can mistake a refused delegation for its own failure.
+- `make_get_auth_context(delegation=...)` — pass the use case to honour the
+  header. The dependency still returns `(IdentityContext, AuthContext)`: the
+  caller's verified identity with the target's context. Refusals map to
+  400 (repeated header, empty value), 404 (unknown org) or 403 (everything
+  else).
+- `AuthContext.acted_by: UserId | None = None` — the caller's ACL id on a
+  delegated request, `None` otherwise. Attribution only: `user_id` stays the
+  acting principal, and `acted_by` is attached after resolution and never
+  cached (the `auth_ctx:{user}:{org}` entry is unchanged).
+- `make_get_current_user(*, get_identity, sync_user_use_case=None,
+  resolve_user_use_case=None)` — an org-less FastAPI dependency returning the
+  caller's ACL `User` (Mode A or Mode B). It refuses `X-On-Behalf-Of`.
+- `ON_BEHALF_OF_HEADER` (`"X-On-Behalf-Of"`), exported from
+  `pkg_auth.integrations.fastapi`.
+
+### Changed
+
+- **An unsupported `X-On-Behalf-Of` now gets 403 instead of being ignored.**
+  Every pkg_auth path that cannot delegate refuses the header (any value):
+  - `make_get_auth_context` without `delegation` → 403 after the caller is
+    resolved;
+  - the Strawberry context getter → 403 before the token is read. It is no
+    longer permissive for this header: an anonymous or invalid-token request
+    carrying it is refused, not passed through;
+  - Django `AuthContextMiddleware` → 403 JSON response before any lookup;
+  - `make_get_current_user` → 403 before the token is checked.
+- `pkg_auth.__version__` was stuck at `"2.1.0"`; it now reports `"3.2.0"`.
+
 ## [3.1.0] — 2026-06-21
 
 ### Added
