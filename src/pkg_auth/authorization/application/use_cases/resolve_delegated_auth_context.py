@@ -7,7 +7,7 @@ from types import MappingProxyType
 from typing import Any
 from uuid import UUID
 
-from ...domain.entities import AuthContext, User
+from ...domain.entities import AuthContext, Organization, User
 from ...domain.exceptions import (
     DelegationRefusal,
     DelegationRefused,
@@ -18,6 +18,22 @@ from ...domain.value_objects import OrgId
 from .resolve_auth_context import ResolveAuthContextUseCase
 
 Delegators = Mapping[str, frozenset[OrgId]]
+
+
+async def find_organization(
+    repo: OrganizationRepository, raw: str
+) -> Organization | None:
+    """Look up an org from a raw ``X-Organization-Id`` value.
+
+    Tries ``raw`` as a UUID first and falls back to a slug lookup. The one
+    lookup rule shared by the FastAPI dependency and the delegated use case,
+    so the two cannot drift.
+    """
+    try:
+        org_id = OrgId(UUID(raw))
+    except ValueError:
+        return await repo.get_by_slug(raw)
+    return await repo.get(org_id)
 
 
 def _to_org_id(raw: Any, sub: str) -> OrgId:
@@ -128,13 +144,8 @@ class ResolveDelegatedAuthContextUseCase:
         if not target_sub.strip():
             raise DelegationRefused(DelegationRefusal.EMPTY_TARGET)
 
-        # Row 6: unknown org (UUID first, then slug — as the FastAPI dep).
-        try:
-            org_id = OrgId(UUID(organization))
-        except ValueError:
-            org = await self.organization_repo.get_by_slug(organization)
-        else:
-            org = await self.organization_repo.get(org_id)
+        # Row 6: unknown org (UUID first, then slug).
+        org = await find_organization(self.organization_repo, organization)
         if org is None:
             raise DelegationRefused(DelegationRefusal.UNKNOWN_ORGANIZATION)
 
