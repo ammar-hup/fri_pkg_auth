@@ -6,7 +6,7 @@ Public API:
     Subject, EmailAddress, RealmName  — identity value objects
     TokenDecoder                — Protocol port for token verification
     AuthenticateTokenUseCase    — token → IdentityContext
-    AuthenticationError, TokenExpiredError, InvalidTokenError
+    AuthenticationError, TokenExpiredError, InvalidTokenError, ServiceTokenError
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from .domain.entities import IdentityContext
 from .domain.exceptions import (
     AuthenticationError,
     InvalidTokenError,
+    ServiceTokenError,
     TokenExpiredError,
 )
 from .domain.ports import TokenDecoder
@@ -30,4 +31,5 @@ __all__ = [
     "AuthenticationError",
     "TokenExpiredError",
     "InvalidTokenError",
+    "ServiceTokenError",
 ]

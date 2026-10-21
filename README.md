@@ -75,6 +75,7 @@ See [`examples/itqadem_courses_app`](examples/itqadem_courses_app) for a complet
 ## Features
 
 - **Authentication** — Keycloak JWT validation producing an `IdentityContext`.
+- **Service token** — a service's own Keycloak token (client credentials), cached and refreshed, for calling other services.
 - **Authorization (ACL)** — database-backed users, organizations, roles, permissions, and memberships, resolved into a hot-path `AuthContext` (`role_names`, `perms`).
 - **Permission visibility** — tri-state catalog visibility (`platform_only` / `shared` / `tenant_only`).
 - **Localized descriptions** — permission descriptions stored as localized JSONB (`LocalizedText`, `ACL_DEFAULT_LOCALE`).
@@ -87,7 +88,7 @@ See [`examples/itqadem_courses_app`](examples/itqadem_courses_app) for a complet
 
 ```
 pkg_auth/
-  authentication/             JWT validation → IdentityContext (identity only)
+  authentication/             JWT validation → IdentityContext; the service's own token
   authorization/              Full ACL (users, orgs, roles, perms, memberships)
     domain/                   Pure entities, ports (Protocol), exceptions
     application/use_cases/    Business logic (use cases)
@@ -112,5 +113,6 @@ pkg_auth/
 - [FastAPI Integration](docs/FastAPI.md)
 - [Django Integration](docs/Django.md)
 - [Strawberry Integration](docs/Strawberry.md)
+- [Service Token](docs/Service-Token.md) — call another service as this service
 - [Keycloak Admin](docs/Keycloak-Admin.md)
 - [Migration v1](docs/MIGRATION_v1.md) · [Migration v2](docs/MIGRATION_v2.md)

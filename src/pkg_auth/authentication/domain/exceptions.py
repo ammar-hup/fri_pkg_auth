@@ -16,3 +16,7 @@ class TokenExpiredError(AuthenticationError):
 
 class InvalidTokenError(AuthenticationError):
     """Token is malformed, has an invalid signature, or fails verification."""
+
+
+class ServiceTokenError(AuthenticationError):
+    """Keycloak did not issue this service's own (client-credentials) token."""

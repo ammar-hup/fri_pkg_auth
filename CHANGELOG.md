@@ -3,6 +3,25 @@
 All notable changes to `pkg-auth` are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Service token**: a service's own Keycloak token, for calling another
+  service as itself (client-credentials grant; the caller is its `azp`).
+  Additive: nothing existing changes.
+- `ServiceCredentials(token_url, client_id, client_secret)`, with
+  `for_realm(...)` and `from_env()`, which reads `KEYCLOAK_BASE_URL`,
+  `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` and `KEYCLOAK_CLIENT_SECRET` and
+  names every one that is unset. The secret is kept out of `repr`.
+- `ServiceTokenProvider`: `get_token()` (sync) and `aget_token()` (async)
+  share one cache. A token is reused until 30 s before it expires (half its
+  lifetime if shorter), then fetched again; `invalidate()` drops it.
+- `ServiceTokenAuth(provider)`: an `httpx.Auth` that sends the token and, on
+  a 401, fetches a fresh one and retries once.
+- `ServiceTokenError` (an `AuthenticationError`) when Keycloak refuses or
+  cannot be reached; the message carries Keycloak's reason, never the secret.
+
 ## [3.2.0] — 2026-10-21
 
 ### Added

@@ -7,6 +7,7 @@
 - [FastAPI](FastAPI)
 - [Django](Django)
 - [Strawberry](Strawberry)
+- [Service Token](Service-Token)
 - [Keycloak Admin](Keycloak-Admin)
 - [Migration v1](MIGRATION_v1)
 - [Migration v2](MIGRATION_v2)
