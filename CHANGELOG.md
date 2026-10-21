@@ -54,6 +54,9 @@ All notable changes to `pkg-auth` are documented here. Versions follow
   - Django `AuthContextMiddleware` → 403 JSON response before any lookup;
   - `make_get_current_user` → 403 before the token is checked.
 - `pkg_auth.__version__` was stuck at `"2.1.0"`; it now reports `"3.2.0"`.
+- The `acl-sqlalchemy` and `dev` extras require `sqlalchemy[asyncio]`.
+  SQLAlchemy 2.1 no longer installs `greenlet`, so a fresh install failed
+  at `import sqlalchemy.ext.asyncio`.
 
 ## [3.1.0] — 2026-06-21
 
