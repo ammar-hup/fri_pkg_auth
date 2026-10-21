@@ -167,19 +167,28 @@ Checks run in `auth:AD-1`'s order; the first match wins. Rows 3–9 raise
 | 2 | Caller not resolved (bad token / not provisioned in Mode B) | 401 / 403 | — |
 | 3 | `X-On-Behalf-Of` repeated | 400 | `REPEATED` |
 | 4 | Header present (any value) and caller not in `delegators` | 403 | `NOT_A_DELEGATOR` |
-| 5 | Empty value | 400 | `EMPTY_TARGET` |
+| 5 | Empty or whitespace-only value | 400 | `EMPTY_TARGET` |
 | 6 | Org unknown | 404 | `UNKNOWN_ORGANIZATION` |
 | 7 | Org not in this agent's list | 403 | `ORGANIZATION_NOT_ALLOWED` |
 | 8 | Target not provisioned | 403 | `TARGET_NOT_PROVISIONED` |
 | 9 | Target not a member of the org | 403 | `TARGET_NOT_A_MEMBER` |
 
-Row 4 runs before any user, org or membership lookup. The target lookup is
-read-only (`UserRepository.get_by_keycloak_sub`) in both modes: delegation
-never creates a user.
+Row 4 runs before any user, org or membership lookup, so a non-delegator
+gets 403 even for an empty value; only a repeated header (row 3) comes first.
+The target `sub` is matched verbatim. The target lookup is read-only
+(`UserRepository.get_by_keycloak_sub`) in both modes: delegation never
+creates a user.
+
+`DelegationRefused` subclasses `AuthorizationError`, which
+`install_exception_handlers` maps to 403. `make_get_auth_context` maps the
+reasons itself; if you call the use case directly, map `reason` the same way
+rather than relying on the catch-all.
 
 Without `delegation`, `make_get_auth_context` refuses any `X-On-Behalf-Of`
-with 403. So do `make_get_current_user`, the Strawberry context getter and
-the Django `AuthContextMiddleware`, none of which can delegate.
+with 403, after rows 1–2 (so a bad token still gets 401). So do
+`make_get_current_user`, the Strawberry context getter and the Django
+`AuthContextMiddleware`, none of which can delegate; they refuse before the
+token is checked, so an anonymous request carrying the header gets 403.
 
 ### Rules for adopters (`estate:AD-27`)
 
@@ -257,7 +266,7 @@ async def delete_course(id: str):
 | Permission missing | 403 |
 | Unknown org | 404 |
 | `X-On-Behalf-Of` where delegation is not wired (incl. `make_get_current_user`) | 403 |
-| `X-On-Behalf-Of` repeated, or empty value | 400 |
+| Delegation: `X-On-Behalf-Of` repeated, or empty value from a delegator | 400 |
 | Delegation: caller not a delegator, org not allowed, target not provisioned or not a member | 403 |
 | Delegation: unknown org | 404 |
 

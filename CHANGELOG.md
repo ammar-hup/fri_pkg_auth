@@ -28,8 +28,10 @@ All notable changes to `pkg-auth` are documented here. Versions follow
 - `make_get_auth_context(delegation=...)` — pass the use case to honour the
   header. The dependency still returns `(IdentityContext, AuthContext)`: the
   caller's verified identity with the target's context. Refusals map to
-  400 (repeated header, empty value), 404 (unknown org) or 403 (everything
-  else).
+  400 (repeated header; empty value from a delegator), 404 (unknown org) or
+  403 (everything else, including any value from a non-delegator).
+  **Ship it with `delegators` empty**: it stays empty until `estate:AD-27`'s
+  audit gate is met (see `docs/FastAPI.md`).
 - `AuthContext.acted_by: UserId | None = None` — the caller's ACL id on a
   delegated request, `None` otherwise. Attribution only: `user_id` stays the
   acting principal, and `acted_by` is attached after resolution and never
