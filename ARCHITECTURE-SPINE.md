@@ -7,7 +7,7 @@ paradigm: 'a published Python library in src/ layout'
 scope: 'invariants binding the shared auth library'
 status: draft
 created: '2026-08-28'
-updated: '2026-10-21'
+updated: '2026-10-26'
 binds: []
 sources: []
 companions: []
@@ -38,6 +38,7 @@ surface, not a local override.
 - `estate:AD-24` — the audit write side is `pkg-audit`, embedded, on the caller's transaction
 - `estate:AD-26` — each service serves its own audit trail through `pkg-audit[fastapi]`, behind its own permission
 - `estate:AD-27` — on-behalf-of authorization is pkg_auth's alone; adopters only configure who may delegate
+- `estate:AD-29` — a membership may carry no role; membership is not staff; every user joins Itqadem
 
 ## Invariants & Rules
 
@@ -104,6 +105,37 @@ surface, not a local override.
   - **Release.** Ships as 3.2.0. The change is additive except for one new behaviour: an
     unsupported `X-On-Behalf-Of` now gets 403 instead of being ignored. The CHANGELOG states it.
     Published only on the owner's yes.
+
+### AD-2 — A roleless membership resolves as a member with no roles and no permissions
+
+- **Binds:** the `authorization` package — the domain `Membership`, both membership repository
+  adapters (SQLAlchemy and Django ORM) and their models, `is_platform_context` — and every
+  integration, through `ResolveAuthContextUseCase`.
+- **Prevents:**
+  - a roleless row crashing resolution (`row.role.name` on NULL), or being skipped so a member
+    is refused as a non-member;
+  - a roleless row read as some default role that carries permissions;
+  - a roleless platform member resolving as a platform context with no permission check;
+  - the two adapters disagreeing on what a roleless row means.
+- **Rule:**
+  - `Membership.role_id` and `Membership.role_name` are optional.
+  - In both adapters, `load_auth_context`, `get` and `list_for_user` accept a row whose `role_id`
+    is NULL. Such a row adds no role name and no permission, so `AuthContext.role_names` and
+    `perms` may both be empty.
+  - `NotAMember` is raised only when the user has no active row in the organization.
+  - `is_platform_context` is true only for a context holding at least one role in the platform
+    organization.
+  - `upsert`'s conflict target is a unique key that exists.
+  - The canonical models (`MembershipORM` and the Django `Membership`) and pkg_auth's bundled
+    migrations mirror the owner's schema, `users:AD-8`: `role_id` nullable, the same constraint
+    names, and the partial unique index for roleless rows.
+  - Consumers take the release by bumping their exact pin; `estate:AD-29` orders that before any
+    roleless row is written.
+  - A delegated request (`auth:AD-1`) into the default organization always finds the target a
+    member. That is harmless: the request carries the target's own roles and permissions, which
+    for a roleless member are none.
+
+  Implements `estate:AD-29`. Established 2026-10-26; estate `.agent/planning/architecture/arch-roleless-membership-2026-10-26/.memlog.md`.
 
 ## Deferred
 
