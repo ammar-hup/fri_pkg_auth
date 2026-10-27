@@ -292,7 +292,8 @@ The helper signature:
 def is_platform_context(
     auth_ctx: AuthContext, platform_org_id: OrgId | None,
 ) -> bool:
-    """True if auth_ctx.organization_id == platform_org_id."""
+    """True if auth_ctx.organization_id == platform_org_id and the
+    context holds at least one role (a roleless member is not an admin)."""
 ```
 
 It returns `False` when `platform_org_id` is `None` (cache not yet

@@ -135,14 +135,22 @@ class Membership:
     construction of an :class:`AuthContext` without re-querying. A user
     can hold multiple memberships in the same organization — one row per
     role — and the schema enforces uniqueness on
-    ``(user_id, organization_id, role_id)``.
+    ``(organization_id, user_id, role_id)``
+    (``uq_memberships_org_user_role_id``).
+
+    A row with ``role_id`` ``None`` is a **roleless** membership: the user
+    is a member of the organization but holds no role there, so both
+    ``role_id`` and ``role_name`` are ``None`` and the row contributes no
+    role name and no permission to an :class:`AuthContext`. At most one
+    roleless row exists per ``(organization_id, user_id)``
+    (partial unique index ``uq_memberships_org_user_roleless``).
     """
 
     id: UUID
     user_id: UserId
     organization_id: OrgId
-    role_id: RoleId
-    role_name: RoleName
+    role_id: RoleId | None
+    role_name: RoleName | None
     status: str
     joined_at: datetime
 

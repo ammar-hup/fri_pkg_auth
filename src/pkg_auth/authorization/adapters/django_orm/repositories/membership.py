@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
+
+from django.db.models import Case, F, IntegerField, Value, When
 
 from ....domain.entities import AuthContext, Membership as DomainMembership
 from ....domain.value_objects import (
@@ -15,13 +18,18 @@ from ..models import Membership as DefaultMembershipModel
 from ..models import Role as DefaultRoleModel
 
 
-def _to_domain(row, role_name: str) -> DomainMembership:
+def _role_name(row: Any) -> str | None:
+    return row.role.name if row.role is not None else None
+
+
+def _to_domain(row, role_name: str | None) -> DomainMembership:
+    """A roleless row (``role_id`` NULL) maps to ``role_id``/``role_name`` None."""
     return DomainMembership(
         id=row.id,
         user_id=UserId(row.user_id),
         organization_id=OrgId(row.organization_id),
-        role_id=RoleId(row.role_id),
-        role_name=RoleName(role_name),
+        role_id=RoleId(row.role_id) if row.role_id is not None else None,
+        role_name=RoleName(role_name) if role_name is not None else None,
         status=row.status,
         joined_at=row.joined_at,
     )
@@ -30,8 +38,9 @@ def _to_domain(row, role_name: str) -> DomainMembership:
 @dataclass(slots=True)
 class DjangoMembershipRepository:
     """Multi-role per (user, org). Storage uniqueness is on
-    ``(user_id, organization_id, role_id)`` and ``load_auth_context``
-    aggregates the union of all active memberships."""
+    ``(organization_id, user_id, role_id)`` and ``load_auth_context``
+    aggregates the union of all active memberships. A roleless row
+    (``role_id`` NULL) is a member with no role and no permission."""
 
     model: type = field(default=DefaultMembershipModel)
     role_model: type = field(default=DefaultRoleModel)
@@ -43,11 +52,20 @@ class DjangoMembershipRepository:
             self.model.objects
             .select_related("role")
             .filter(user_id=user_id.value, organization_id=org_id.value)
+            .order_by(
+                Case(
+                    When(status="active", then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                ),
+                F("role_id").asc(nulls_last=True),
+                "role_id",
+            )
             .afirst()
         )
         if row is None:
             return None
-        return _to_domain(row, row.role.name)
+        return _to_domain(row, _role_name(row))
 
     async def upsert(
         self,
@@ -99,6 +117,8 @@ class DjangoMembershipRepository:
         any_active = False
         async for row in rows:
             any_active = True
+            if row.role is None:
+                continue
             role_names.add(row.role.name)
             async for k in row.role.permissions.all().values_list("key", flat=True):
                 perms.add(k)
@@ -115,4 +135,4 @@ class DjangoMembershipRepository:
         rows = self.model.objects.select_related("role").filter(
             user_id=user_id.value
         )
-        return [_to_domain(r, r.role.name) async for r in rows]
+        return [_to_domain(r, _role_name(r)) async for r in rows]

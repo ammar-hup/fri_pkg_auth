@@ -3,6 +3,61 @@
 All notable changes to `pkg-auth` are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [3.4.0] — Unreleased
+
+Roleless memberships (`auth:AD-2`, `users:AD-8`, `estate:AD-29`): a
+`memberships` row with `role_id` NULL is a **member with no role**. This
+release only reads such rows; pkg_auth never writes one.
+
+### Changed — breaking
+
+- **Type: `Membership.role_id` is now `RoleId | None` and
+  `Membership.role_name` is now `RoleName | None`.** Both are `None` for a
+  roleless row. Code that reads `membership.role_name` (or `role_id`) must
+  handle `None`.
+- **Behaviour: `is_platform_context` returns `False` for a roleless platform
+  context.** It is true only when the context is in the platform
+  organization **and** holds at least one role; a roleless member of the
+  platform organization is not a platform admin.
+
+### Changed
+
+- **Roleless read semantics, both adapters** (SQLAlchemy and Django ORM):
+  `load_auth_context` returns an `AuthContext` for a user whose only active
+  row is roleless, with empty `role_names` and `perms`; alongside role rows a
+  roleless row adds nothing. `NotAMember` still means "no active row in the
+  organization". `get` and `list_for_user` map a roleless row to
+  `role_id`/`role_name` `None` instead of raising `AttributeError`.
+- `get` returns the first row for `(user, org)`: active rows first, then
+  role rows before the roleless one, then by `role_id`. An active roleless
+  row therefore beats a suspended or ended role row. The SQLAlchemy adapter
+  no longer raises `MultipleResultsFound` for a user with several rows in
+  one organization (Django already returned the first).
+- **SQLAlchemy `upsert`** now targets the unique key that exists,
+  `(user_id, organization_id, role_id)`, and on conflict updates `status`
+  only. It no longer reassigns `role_id` on conflict: an upsert with a
+  different `role_id` adds a row, matching the Django adapter's existing
+  `aupdate_or_create`. The previous target `(user_id, organization_id)`
+  matched no unique key, so the old reassigning path errored at runtime
+  anyway.
+- **Canonical models mirror `users:AD-8`**: `MembershipORM.role_id` /
+  `role` and the Django `Membership.role` are nullable; the unique key is
+  named `uq_memberships_org_user_role_id` on
+  `(organization_id, user_id, role_id)`, plus the partial unique index
+  `uq_memberships_org_user_roleless` on `(organization_id, user_id) WHERE
+  role_id IS NULL`. The Django model's `unique_together` became the two named
+  `UniqueConstraint`s (`managed=False`, so no Django migration).
+
+### Added
+
+- Bundled migration **`pkg_auth_acl_0006`** (revises `pkg_auth_acl_0005`):
+  drops `NOT NULL` on `memberships.role_id`, renames the unique constraint
+  `uq_memberships_user_org_role` to `uq_memberships_org_user_role_id`
+  (column order `organization_id, user_id, role_id`), and creates
+  `uq_memberships_org_user_roleless`. Its downgrade is not a rollback path
+  once a roleless row exists: it raises `RuntimeError` before touching the
+  schema while any `role_id IS NULL` row is present.
+
 ## [Unreleased]
 
 ### Added

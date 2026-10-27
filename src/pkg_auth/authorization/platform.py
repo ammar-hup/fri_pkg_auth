@@ -41,7 +41,12 @@ def is_platform_context(
     example before the cache is initialized, or in services that
     don't have a designated platform org — this returns ``False``,
     which is equivalent to "no platform-admin privileges available".
+
+    A platform context also requires at least one role: a roleless
+    member of the platform organization is not a platform admin.
     """
     if platform_org_id is None:
         return False
-    return auth_ctx.organization_id == platform_org_id
+    return auth_ctx.organization_id == platform_org_id and bool(
+        auth_ctx.role_names
+    )

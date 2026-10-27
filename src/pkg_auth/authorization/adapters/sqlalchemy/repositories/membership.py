@@ -20,13 +20,18 @@ from ..models import MembershipORM as DefaultMembershipORM
 from ..models import RoleORM as DefaultRoleORM
 
 
-def _to_membership(row: Any, role_name: str) -> Membership:
+def _role_name(row: Any) -> str | None:
+    return row.role.name if row.role is not None else None
+
+
+def _to_membership(row: Any, role_name: str | None) -> Membership:
+    """A roleless row (``role_id`` NULL) maps to ``role_id``/``role_name`` None."""
     return Membership(
         id=row.id,
         user_id=UserId(row.user_id),
         organization_id=OrgId(row.organization_id),
-        role_id=RoleId(row.role_id),
-        role_name=RoleName(role_name),
+        role_id=RoleId(row.role_id) if row.role_id is not None else None,
+        role_name=RoleName(role_name) if role_name is not None else None,
         status=row.status,
         joined_at=row.joined_at,
     )
@@ -41,6 +46,8 @@ class SqlAlchemyMembershipRepository:
     async def get(
         self, user_id: UserId, org_id: OrgId
     ) -> Membership | None:
+        """First row for (user, org): active rows first, then role rows
+        before the roleless one, then ``role_id`` for determinism."""
         async with self.session_factory() as session:
             row = (
                 await session.execute(
@@ -50,9 +57,15 @@ class SqlAlchemyMembershipRepository:
                         self.model.user_id == user_id.value,
                         self.model.organization_id == org_id.value,
                     )
+                    .order_by(
+                        self.model.status != "active",
+                        self.model.role_id.is_(None),
+                        self.model.role_id,
+                    )
+                    .limit(1)
                 )
             ).scalar_one_or_none()
-            return _to_membership(row, row.role.name) if row is not None else None
+            return _to_membership(row, _role_name(row)) if row is not None else None
 
     async def upsert(
         self,
@@ -71,8 +84,8 @@ class SqlAlchemyMembershipRepository:
                 status=status,
             )
             .on_conflict_do_update(
-                index_elements=["user_id", "organization_id"],
-                set_={"role_id": role_id.value, "status": status},
+                index_elements=["user_id", "organization_id", "role_id"],
+                set_={"status": status},
             )
             .returning(self.model)
         )
@@ -104,6 +117,9 @@ class SqlAlchemyMembershipRepository:
     ) -> AuthContext | None:
         """Multi-role: fetch ALL active memberships for (user, org),
         merge their roles' permissions into a single AuthContext.
+
+        A roleless row still makes the user a member (a context is
+        returned) but adds no role name and no permission.
         """
         async with self.session_factory() as session:
             stmt = (
@@ -125,6 +141,8 @@ class SqlAlchemyMembershipRepository:
             role_names: set[str] = set()
             all_perms: set[str] = set()
             for row in rows:
+                if row.role is None:
+                    continue
                 role_names.add(row.role.name)
                 all_perms.update(p.key for p in row.role.permissions)
             return AuthContext(
@@ -143,4 +161,4 @@ class SqlAlchemyMembershipRepository:
                     .where(self.model.user_id == user_id.value)
                 )
             ).scalars().all()
-            return [_to_membership(r, r.role.name) for r in rows]
+            return [_to_membership(r, _role_name(r)) for r in rows]

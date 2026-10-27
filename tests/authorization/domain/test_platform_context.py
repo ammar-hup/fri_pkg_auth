@@ -37,13 +37,25 @@ def test_returns_false_when_platform_org_id_is_none():
     assert is_platform_context(ctx, None) is False
 
 
-def test_helper_does_not_inspect_role_names_or_perms():
-    """The check is purely org-id based — role/perm content is irrelevant."""
+def test_roleless_member_of_platform_org_is_not_platform_context():
+    """auth:AD-2 — a platform context requires at least one role."""
     platform_org = OrgId(uuid4())
     ctx = AuthContext(
         user_id=UserId(uuid4()),
         organization_id=platform_org,
         role_names=frozenset(),  # no roles
         perms=frozenset(),         # no perms
+    )
+    assert is_platform_context(ctx, platform_org) is False
+
+
+def test_platform_context_needs_a_role_not_a_perm():
+    """One role with no permissions is enough; perms are not inspected."""
+    platform_org = OrgId(uuid4())
+    ctx = AuthContext(
+        user_id=UserId(uuid4()),
+        organization_id=platform_org,
+        role_names=frozenset({"platform-viewer"}),
+        perms=frozenset(),
     )
     assert is_platform_context(ctx, platform_org) is True

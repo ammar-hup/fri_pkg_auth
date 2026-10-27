@@ -36,6 +36,7 @@ from uuid import UUID
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -177,11 +178,20 @@ class RolePermissionORM(AclBase):
 
 
 class MembershipORM(AclBase, MembershipMixin):
+    """Mirrors ``users:AD-8``: ``role_id`` NULL is a roleless member, at
+    most one per ``(organization_id, user_id)``."""
+
     __tablename__ = "memberships"
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "organization_id", "role_id",
-            name="uq_memberships_user_org_role",
+            "organization_id", "user_id", "role_id",
+            name="uq_memberships_org_user_role_id",
+        ),
+        Index(
+            "uq_memberships_org_user_roleless",
+            "organization_id", "user_id",
+            unique=True,
+            postgresql_where=text("role_id IS NULL"),
         ),
     )
 
@@ -200,9 +210,10 @@ class MembershipORM(AclBase, MembershipMixin):
         ForeignKey("organizations.id", ondelete="CASCADE"),
         index=True,
     )
-    role_id: Mapped[UUID] = mapped_column(
+    role_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("roles.id", ondelete="RESTRICT"),
+        nullable=True,
         index=True,
     )
     status: Mapped[str] = mapped_column(String(32), server_default="active")
@@ -211,7 +222,7 @@ class MembershipORM(AclBase, MembershipMixin):
     organization: Mapped[OrganizationORM] = relationship(
         back_populates="memberships"
     )
-    role: Mapped[RoleORM] = relationship(back_populates="memberships")
+    role: Mapped[RoleORM | None] = relationship(back_populates="memberships")
 
 
 class MembershipInvitationORM(AclBase):

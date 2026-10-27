@@ -140,11 +140,15 @@ class RolePermission(models.Model):
 
 
 class Membership(MembershipMixin):
-    """Multi-role-aware: ``UNIQUE(user, organization, role)``.
+    """Multi-role-aware: ``UNIQUE(organization, user, role)``.
 
     A user can hold multiple memberships in the same organization (one row
     per role); ``DjangoMembershipRepository.load_auth_context`` aggregates
     them into the union of all active roles' permissions.
+
+    ``role`` NULL is a roleless member (``users:AD-8``): at most one such
+    row per ``(organization, user)``, contributing no role and no
+    permission.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -163,6 +167,8 @@ class Membership(MembershipMixin):
     role = models.ForeignKey(
         Role,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         db_column="role_id",
         related_name="memberships",
     )
@@ -172,7 +178,17 @@ class Membership(MembershipMixin):
         managed = False
         db_table = "memberships"
         app_label = "pkg_auth_acl"
-        unique_together = (("user", "organization", "role"),)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "user", "role"],
+                name="uq_memberships_org_user_role_id",
+            ),
+            models.UniqueConstraint(
+                fields=["organization", "user"],
+                condition=models.Q(role__isnull=True),
+                name="uq_memberships_org_user_roleless",
+            ),
+        ]
 
 
 class MembershipInvitation(models.Model):
